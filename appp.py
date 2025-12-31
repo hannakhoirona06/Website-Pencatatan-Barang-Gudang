@@ -1,5 +1,5 @@
 # ==================================================
-# APLIKASI GUDANG QR - FINAL (BARCODE PER BARANG)
+# APLIKASI GUDANG QR - FINAL (BARCODE PER BARANG + EDIT/HAPUS)
 # ==================================================
 import streamlit as st
 import pandas as pd
@@ -61,6 +61,7 @@ def decode_qr(img_file):
     data, _, _ = cv2.QRCodeDetector().detectAndDecode(img)
     return data if data else None
 
+
 # ---------------- CART ----------------
 def init_cart():
     if "cart" not in st.session_state:
@@ -76,6 +77,7 @@ def add_cart(item):
 
 def clear_cart():
     st.session_state.cart = []
+
 
 # ---------------- APP ----------------
 st.set_page_config("Gudang QR Final", layout="centered")
@@ -194,13 +196,45 @@ elif menu == "Scan & Transaksi":
             st.success("Transaksi berhasil")
 
 # ==================================================
-# MENU 3 – MANAJEMEN DATA + BARCODE PER BARANG
+# MENU 3 – MANAJEMEN DATA + BARCODE + EDIT + HAPUS
 # ==================================================
 elif menu == "Manajemen Data":
     st.title("⚙️ Manajemen Data Barang")
 
     df = load_barang()
     st.dataframe(df, use_container_width=True)
+
+    if not df.empty:
+        st.subheader("✏️ Edit / Hapus Barang")
+        pilih = st.selectbox("Pilih Barang", df["id"])
+        row = df[df["id"] == pilih].iloc[0]
+
+        nama = st.text_input("Nama", row["nama"])
+        harga = st.number_input("Harga", value=int(row["harga"]), step=1000)
+        stok = st.number_input("Stok", value=int(row["stok"]), step=1)
+
+        colu1, colu2 = st.columns(2)
+
+        with colu1:
+            if st.button("💾 Update Data"):
+                df.loc[df["id"] == pilih, ["nama","harga","stok"]] = [
+                    nama, int(harga), int(stok)
+                ]
+                save_barang(df)
+                st.success("Data diperbarui")
+                st.rerun()
+
+        with colu2:
+            if st.button("🗑 Hapus Data"):
+                df = df[df["id"] != pilih]
+                save_barang(df)
+
+                qr_file = os.path.join(QR_DIR, f"{pilih}.png")
+                if os.path.exists(qr_file):
+                    os.remove(qr_file)
+
+                st.success("Data berhasil dihapus")
+                st.rerun()
 
     st.markdown("### 📌 Daftar Barcode Barang (langsung download)")
     for _, row in df.iterrows():
@@ -217,7 +251,6 @@ elif menu == "Manajemen Data":
             with open(qr_path, "rb") as f:
                 st.download_button("⬇ Download", f, file_name=f"{kode}.png", key=kode)
 
-    # BONUS ZIP ALL
     if st.button("⬇ Download Semua Barcode (ZIP)"):
         zip_path = "barcode_all.zip"
         with zipfile.ZipFile(zip_path, "w") as z:
@@ -226,6 +259,7 @@ elif menu == "Manajemen Data":
 
         with open(zip_path, "rb") as f:
             st.download_button("Download ZIP", f, file_name="barcode_all.zip")
+
 
 # ==================================================
 # MENU 4 – LAPORAN
@@ -236,4 +270,7 @@ elif menu == "Laporan":
     st.dataframe(df, use_container_width=True)
 
     if not df.empty:
-        st.download_button("⬇ Download CSV Transaksi", df.to_csv(index=False), "transaksi.csv", "text/csv")
+        st.download_button("⬇ Download CSV Transaksi",
+                           df.to_csv(index=False),
+                           "transaksi.csv",
+                           "text/csv")
